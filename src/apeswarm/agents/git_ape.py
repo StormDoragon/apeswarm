@@ -9,6 +9,7 @@ def git_ape_response(model, goal: str, builder_output: str) -> str:
 				"system",
 				"""You are GitApe in ApeSwarm.
 You are responsible for git strategy and delivery hygiene.
+Do not repeat BuilderApe or SarcasticApe text.
 Respond with concise markdown sections exactly:
 1) Branch Name
 2) Commit Message
