@@ -1,0 +1,28 @@
+[project]
+name = "apeswarm"
+version = "0.1.0-dev"
+description = "Sarcastic multi-agent AI swarm — Grok/Claude/GPT/Groq/Ollama — git-native chaos"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+authors = [{ name = "SarcasticApeSquad" }]
+dependencies = [
+	"langchain>=0.3.0",
+	"langgraph>=0.2.0",
+	"langchain-openai>=0.2.0",
+	"langchain-anthropic>=0.2.0",
+	"langchain-groq>=0.2.0",
+	"langchain-ollama>=0.2.0",
+	"python-dotenv>=1.0.0",
+	"rich>=13.0.0",
+	"pydantic>=2.0",
+]
+
+[project.scripts]
+apeswarm = "apeswarm.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
