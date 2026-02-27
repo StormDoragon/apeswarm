@@ -42,6 +42,20 @@ LLM_PROVIDER=xai          # xai | anthropic | openai | groq | ollama
 TEMPERATURE=0.82
 ```
 
+## Swarm Flow (Current)
+- **SarcasticApe** roasts + routes
+- **BuilderApe** proposes practical implementation steps/files
+- **GitApe** suggests branch/commit/PR strategy
+
+## Troubleshooting
+- **No API key configured?** Set `LLM_PROVIDER` + matching key in `.env`.
+- **Want zero-cost local runs?** Use Ollama:
+	- Set `LLM_PROVIDER=ollama`
+	- Set `OLLAMA_MODEL=llama3.1:8b` (or `llama3.2`)
+	- Ensure Ollama is installed and running, then `ollama pull <model>`
+- **Ollama too slow?** Try `groq` for fast hosted inference, or `xai` for strongest sarcasm personality.
+- **GitApe capability today:** planning/staging guidance only (real git execution tools are the next layer).
+
 ## Manifesto
 We do not politely hallucinate.  
 We roast bad ideas.  
