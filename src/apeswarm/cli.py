@@ -1,49 +1,13 @@
 import sys
-from typing import TypedDict
 
 from dotenv import load_dotenv
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.prompts import ChatPromptTemplate
-from langgraph.graph import END, START, StateGraph
 from rich.console import Console
+from rich.markdown import Markdown
 
-from .core.model_factory import get_model
+from .core.orchestrator import execute_swarm
 
 load_dotenv()
 console = Console()
-
-
-class AgentState(TypedDict):
-	goal: str
-	response: str
-
-
-def _build_graph():
-	prompt = ChatPromptTemplate.from_messages(
-		[
-			(
-				"system",
-				"""You are SarcasticApe, founder of ApeSwarm.
-Maximum sarcasm. Zero tolerance for mediocre ideas.
-Roast if necessary. Then propose a brutally efficient plan to ship world-shaking software.
-Always end responses with 🦍""",
-			),
-			("human", "{goal}"),
-		]
-	)
-
-	model = get_model(temperature=0.82)
-	chain = prompt | model | StrOutputParser()
-
-	def sarcastic_ape_node(state: AgentState) -> AgentState:
-		return {"goal": state["goal"], "response": chain.invoke({"goal": state["goal"]})}
-
-	graph_builder = StateGraph(AgentState)
-	graph_builder.add_node("sarcastic_ape", sarcastic_ape_node)
-	graph_builder.add_edge(START, "sarcastic_ape")
-	graph_builder.add_edge("sarcastic_ape", END)
-	return graph_builder.compile()
-
 
 def main() -> None:
 	if len(sys.argv) < 2:
@@ -56,9 +20,8 @@ def main() -> None:
 	console.print(f"[bold yellow]Goal:[/] {goal}\n")
 
 	try:
-		graph = _build_graph()
-		with console.status("[bold green]SarcasticApe is judging your existence..."):
-			result = graph.invoke({"goal": goal, "response": ""})
+		with console.status("[bold green]Swarm is roasting, building, and planning git ops..."):
+			events, final_state = execute_swarm(goal=goal, thread_id="default")
 	except ValueError as error:
 		console.print(f"[bold red]Config error:[/] {error}")
 		console.print("[bold cyan]Tip:[/] Copy .env.example to .env and set your provider + API key.")
@@ -70,8 +33,18 @@ def main() -> None:
 		)
 		raise SystemExit(3) from error
 
-	console.print("\n[bold magenta]SarcasticApe verdict:[/]")
-	console.print(result["response"])
+	for event in events:
+		if event["agent"] == "SarcasticApe":
+			style = "bold magenta"
+		elif event["agent"] == "BuilderApe":
+			style = "bold cyan"
+		else:
+			style = "bold green"
+		console.print(f"\n[{style}]{event['agent']}:[/]")
+		console.print(Markdown(event["content"]))
+
+	console.print("\n[bold white on dark_green]Swarm complete.[/]")
+	console.print("[bold yellow]Active Agent:[/] " + final_state["active_agent"])
 
 
 if __name__ == "__main__":
