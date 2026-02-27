@@ -34,6 +34,10 @@ cp .env.example .env
 **Awaken the swarm:**
 ```bash
 uv run apeswarm "build something that will shake the world"
+
+# optional flags
+uv run apeswarm "ship this safely" --self-edit --self-edit-iterations 2
+uv run apeswarm "prepare release" --allow-git-write --auto-confirm
 ```
 
 ## Choose Your Brain (`.env`)
@@ -45,7 +49,10 @@ TEMPERATURE=0.82
 ## Swarm Flow (Current)
 - **SarcasticApe** roasts + routes
 - **BuilderApe** proposes practical implementation steps/files
-- **GitApe** suggests branch/commit/PR strategy
+- **TruthApe** verifies claims + highlights risk
+- **SelfEditApe** proposes safe self-improvement loop targets
+- **GitApe** proposes branch/commit/PR strategy
+- **GitExec** executes GitApe plan in dry-run by default (write mode is opt-in)
 
 ## Example Multi-Agent Run
 ```text
@@ -75,7 +82,7 @@ GitApe:
 	- Set `OLLAMA_MODEL=llama3.1:8b` (or `llama3.2`)
 	- Ensure Ollama is installed and running, then `ollama pull <model>`
 - **Ollama too slow?** Try `groq` for fast hosted inference, or `xai` for strongest sarcasm personality.
-- **GitApe capability today:** planning/staging guidance only (real git execution tools are the next layer).
+- **GitApe capability today:** can execute real branch+commit with `--allow-git-write --auto-confirm`.
 
 ## Manifesto
 We do not politely hallucinate.  
