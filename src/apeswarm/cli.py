@@ -31,6 +31,11 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
 		help="Enable the SelfEditApe planning loop",
 	)
 	parser.add_argument(
+		"--confirm-self-edit-write",
+		action="store_true",
+		help="Required alongside --allow-git-write when self-edit is enabled",
+	)
+	parser.add_argument(
 		"--self-edit-iterations",
 		type=int,
 		default=1,
@@ -54,7 +59,8 @@ def main() -> None:
 		+ f"thread_id={args.thread_id} | "
 		+ f"git_write={args.allow_git_write} | "
 		+ f"auto_confirm={args.auto_confirm} | "
-		+ f"self_edit={args.self_edit} ({args.self_edit_iterations})"
+		+ f"self_edit={args.self_edit} ({args.self_edit_iterations}) | "
+		+ f"confirm_self_edit_write={args.confirm_self_edit_write}"
 		+ "[/dim]\n"
 	)
 
@@ -65,6 +71,7 @@ def main() -> None:
 				thread_id=args.thread_id,
 				allow_git_write=args.allow_git_write,
 				auto_confirm=args.auto_confirm,
+				confirm_self_edit_write=args.confirm_self_edit_write,
 				enable_self_edit=args.self_edit,
 				self_edit_iterations=args.self_edit_iterations,
 			)
@@ -88,6 +95,10 @@ def main() -> None:
 			style = "bold bright_blue"
 		elif event["agent"] == "SelfEditApe":
 			style = "bold bright_white"
+		elif event["agent"] == "DiffPreview":
+			style = "bold yellow"
+		elif event["agent"] == "Guardrail":
+			style = "bold red"
 		elif event["agent"] == "GitExec":
 			style = "bold bright_green"
 		else:

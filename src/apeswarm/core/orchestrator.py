@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 from typing import TypedDict
 
 from langgraph.checkpoint.memory import MemorySaver
@@ -21,12 +22,15 @@ class SwarmState(TypedDict):
 	active_agent: str
 	allow_git_write: bool
 	auto_confirm: bool
+	confirm_self_edit_write: bool
 	enable_self_edit: bool
 	self_edit_iterations: int
 	sarcastic_output: str
 	builder_output: str
 	truth_output: str
 	self_edit_output: str
+	self_edit_diff_preview: str
+	self_edit_guardrail_note: str
 	git_output: str
 	git_exec_output: str
 	search_context: str
@@ -41,6 +45,31 @@ _CHECKPOINTER = MemorySaver()
 _APP = None
 
 
+def _build_self_edit_diff_preview(self_edit_output: str) -> str:
+	lines = [line.strip() for line in self_edit_output.splitlines() if line.strip()]
+	targets = [line.lstrip("-•0123456789. ") for line in lines if line.startswith(("-", "•"))]
+	if not targets:
+		targets = lines[:3]
+
+	preview_chunks: list[str] = []
+	for target in targets[:3]:
+		match = re.search(r"([a-zA-Z0-9_./-]+\.(py|md|toml|yml|yaml|txt))", target)
+		file_name = match.group(1) if match else "TBD_FILE"
+		preview_chunks.append(
+			"\n".join(
+				[
+					f"--- a/{file_name}",
+					f"+++ b/{file_name}",
+					"@@", 
+					"- TODO: existing behavior", 
+					f"+ TODO: {target}",
+				]
+			)
+		)
+
+	return "Proposed self-edit diff preview (simulation only):\n\n```diff\n" + "\n\n".join(preview_chunks) + "\n```"
+
+
 def _build_app():
 	model = get_model()
 
@@ -50,12 +79,15 @@ def _build_app():
 			"active_agent": "BuilderApe",
 			"allow_git_write": state["allow_git_write"],
 			"auto_confirm": state["auto_confirm"],
+			"confirm_self_edit_write": state["confirm_self_edit_write"],
 			"enable_self_edit": state["enable_self_edit"],
 			"self_edit_iterations": state["self_edit_iterations"],
 			"sarcastic_output": sarcastic_ape_response(model, state["goal"]),
 			"builder_output": state["builder_output"],
 			"truth_output": state["truth_output"],
 			"self_edit_output": state["self_edit_output"],
+			"self_edit_diff_preview": state["self_edit_diff_preview"],
+			"self_edit_guardrail_note": state["self_edit_guardrail_note"],
 			"git_output": state["git_output"],
 			"git_exec_output": state["git_exec_output"],
 			"search_context": state["search_context"],
@@ -67,6 +99,7 @@ def _build_app():
 			"active_agent": "TruthApe",
 			"allow_git_write": state["allow_git_write"],
 			"auto_confirm": state["auto_confirm"],
+			"confirm_self_edit_write": state["confirm_self_edit_write"],
 			"enable_self_edit": state["enable_self_edit"],
 			"self_edit_iterations": state["self_edit_iterations"],
 			"sarcastic_output": state["sarcastic_output"],
@@ -77,6 +110,8 @@ def _build_app():
 			),
 			"truth_output": state["truth_output"],
 			"self_edit_output": state["self_edit_output"],
+			"self_edit_diff_preview": state["self_edit_diff_preview"],
+			"self_edit_guardrail_note": state["self_edit_guardrail_note"],
 			"git_output": state["git_output"],
 			"git_exec_output": state["git_exec_output"],
 			"search_context": state["search_context"],
@@ -88,6 +123,7 @@ def _build_app():
 			"active_agent": "SelfEditApe",
 			"allow_git_write": state["allow_git_write"],
 			"auto_confirm": state["auto_confirm"],
+			"confirm_self_edit_write": state["confirm_self_edit_write"],
 			"enable_self_edit": state["enable_self_edit"],
 			"self_edit_iterations": state["self_edit_iterations"],
 			"sarcastic_output": state["sarcastic_output"],
@@ -99,14 +135,18 @@ def _build_app():
 				search_context=state["search_context"],
 			),
 			"self_edit_output": state["self_edit_output"],
+			"self_edit_diff_preview": state["self_edit_diff_preview"],
+			"self_edit_guardrail_note": state["self_edit_guardrail_note"],
 			"git_output": state["git_output"],
 			"git_exec_output": state["git_exec_output"],
 			"search_context": state["search_context"],
 		}
 
 	def self_edit_ape_node(state: SwarmState) -> SwarmState:
+		guardrail_note = ""
 		if not state["enable_self_edit"]:
 			self_edit_output = "Self-edit loop disabled for this run."
+			self_edit_diff_preview = ""
 		else:
 			self_edit_output = self_edit_ape_response(
 				model=model,
@@ -114,17 +154,29 @@ def _build_app():
 				truth_output=state["truth_output"],
 				iterations=state["self_edit_iterations"],
 			)
+			self_edit_diff_preview = _build_self_edit_diff_preview(self_edit_output)
+
+		if state["enable_self_edit"] and state["allow_git_write"] and not state["confirm_self_edit_write"]:
+			guardrail_note = (
+				"Self-edit write request blocked: pass --confirm-self-edit-write together with "
+				"--allow-git-write to permit write-mode while self-edit is enabled."
+			)
 		return {
 			"goal": state["goal"],
 			"active_agent": "GitApe",
-			"allow_git_write": state["allow_git_write"],
+			"allow_git_write": (
+				state["allow_git_write"] and (state["confirm_self_edit_write"] or not state["enable_self_edit"])
+			),
 			"auto_confirm": state["auto_confirm"],
+			"confirm_self_edit_write": state["confirm_self_edit_write"],
 			"enable_self_edit": state["enable_self_edit"],
 			"self_edit_iterations": state["self_edit_iterations"],
 			"sarcastic_output": state["sarcastic_output"],
 			"builder_output": state["builder_output"],
 			"truth_output": state["truth_output"],
 			"self_edit_output": self_edit_output,
+			"self_edit_diff_preview": self_edit_diff_preview,
+			"self_edit_guardrail_note": guardrail_note,
 			"git_output": state["git_output"],
 			"git_exec_output": state["git_exec_output"],
 			"search_context": state["search_context"],
@@ -147,12 +199,15 @@ def _build_app():
 			"active_agent": "done",
 			"allow_git_write": state["allow_git_write"],
 			"auto_confirm": state["auto_confirm"],
+			"confirm_self_edit_write": state["confirm_self_edit_write"],
 			"enable_self_edit": state["enable_self_edit"],
 			"self_edit_iterations": state["self_edit_iterations"],
 			"sarcastic_output": state["sarcastic_output"],
 			"builder_output": state["builder_output"],
 			"truth_output": state["truth_output"],
 			"self_edit_output": state["self_edit_output"],
+			"self_edit_diff_preview": state["self_edit_diff_preview"],
+			"self_edit_guardrail_note": state["self_edit_guardrail_note"],
 			"git_output": git_output,
 			"git_exec_output": git_exec_output,
 			"search_context": state["search_context"],
@@ -185,6 +240,7 @@ def execute_swarm(
 	thread_id: str = "default",
 	allow_git_write: bool = False,
 	auto_confirm: bool = False,
+	confirm_self_edit_write: bool = False,
 	enable_self_edit: bool = False,
 	self_edit_iterations: int = 1,
 ) -> tuple[list[SwarmEvent], SwarmState]:
@@ -195,12 +251,15 @@ def execute_swarm(
 		"active_agent": "SarcasticApe",
 		"allow_git_write": allow_git_write,
 		"auto_confirm": auto_confirm,
+		"confirm_self_edit_write": confirm_self_edit_write,
 		"enable_self_edit": enable_self_edit,
 		"self_edit_iterations": max(1, self_edit_iterations),
 		"sarcastic_output": "",
 		"builder_output": "",
 		"truth_output": "",
 		"self_edit_output": "",
+		"self_edit_diff_preview": "",
+		"self_edit_guardrail_note": "",
 		"git_output": "",
 		"git_exec_output": "",
 		"search_context": search_context,
@@ -221,6 +280,10 @@ def execute_swarm(
 				events.append({"agent": "TruthApe", "content": patch["truth_output"]})
 			elif node_name == "self_edit_ape" and patch.get("self_edit_output"):
 				events.append({"agent": "SelfEditApe", "content": patch["self_edit_output"]})
+				if patch.get("self_edit_diff_preview"):
+					events.append({"agent": "DiffPreview", "content": patch["self_edit_diff_preview"]})
+				if patch.get("self_edit_guardrail_note"):
+					events.append({"agent": "Guardrail", "content": patch["self_edit_guardrail_note"]})
 			elif node_name == "git_ape" and patch.get("git_output"):
 				events.append({"agent": "GitApe", "content": patch["git_output"]})
 				if patch.get("git_exec_output"):
