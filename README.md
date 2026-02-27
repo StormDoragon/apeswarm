@@ -47,6 +47,27 @@ TEMPERATURE=0.82
 - **BuilderApe** proposes practical implementation steps/files
 - **GitApe** suggests branch/commit/PR strategy
 
+## Example Multi-Agent Run
+```text
+$ apeswarm "roast my decision to build in public and give a 5-step viral plan"
+
+SarcasticApe:
+- Roast
+- Strategy
+- Handoff to BuilderApe
+
+BuilderApe:
+- Build Plan
+- Proposed File Changes
+- Handoff to GitApe
+
+GitApe:
+- Branch Name: public-beta-1
+- Commit Message: feat(public-beta): Initialize public beta release...
+- PR Title: Public Beta Release: Unfiltered Ape Product for Your Viewing Pleasure!
+- Merge Checklist
+```
+
 ## Troubleshooting
 - **No API key configured?** Set `LLM_PROVIDER` + matching key in `.env`.
 - **Want zero-cost local runs?** Use Ollama:
