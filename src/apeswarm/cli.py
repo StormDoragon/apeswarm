@@ -95,6 +95,8 @@ def main() -> None:
 			style = "bold bright_blue"
 		elif event["agent"] == "SelfEditApe":
 			style = "bold bright_white"
+		elif event["agent"] == "PatchesApplied":
+			style = "bold bright_green"
 		elif event["agent"] == "DiffPreview":
 			style = "bold yellow"
 		elif event["agent"] == "Guardrail":

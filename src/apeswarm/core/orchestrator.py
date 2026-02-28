@@ -12,6 +12,7 @@ from apeswarm.agents import (
 	self_edit_ape_response,
 	truth_ape_response,
 )
+from apeswarm.core.file_patcher import apply_self_edit_patches
 from apeswarm.core.git_executor import execute_git_plan
 from apeswarm.core.model_factory import get_model
 from apeswarm.core.search import collect_repo_context
@@ -31,6 +32,7 @@ class SwarmState(TypedDict):
 	self_edit_output: str
 	self_edit_diff_preview: str
 	self_edit_guardrail_note: str
+	self_edit_applied_patches: list[str]
 	git_output: str
 	git_exec_output: str
 	search_context: str
@@ -87,8 +89,7 @@ def _build_app():
 			"truth_output": state["truth_output"],
 			"self_edit_output": state["self_edit_output"],
 			"self_edit_diff_preview": state["self_edit_diff_preview"],
-			"self_edit_guardrail_note": state["self_edit_guardrail_note"],
-			"git_output": state["git_output"],
+			"self_edit_guardrail_note": state["self_edit_guardrail_note"],			"self_edit_applied_patches": state["self_edit_applied_patches"],			"git_output": state["git_output"],
 			"git_exec_output": state["git_exec_output"],
 			"search_context": state["search_context"],
 		}
@@ -112,6 +113,7 @@ def _build_app():
 			"self_edit_output": state["self_edit_output"],
 			"self_edit_diff_preview": state["self_edit_diff_preview"],
 			"self_edit_guardrail_note": state["self_edit_guardrail_note"],
+			"self_edit_applied_patches": state["self_edit_applied_patches"],
 			"git_output": state["git_output"],
 			"git_exec_output": state["git_exec_output"],
 			"search_context": state["search_context"],
@@ -137,6 +139,7 @@ def _build_app():
 			"self_edit_output": state["self_edit_output"],
 			"self_edit_diff_preview": state["self_edit_diff_preview"],
 			"self_edit_guardrail_note": state["self_edit_guardrail_note"],
+			"self_edit_applied_patches": state["self_edit_applied_patches"],
 			"git_output": state["git_output"],
 			"git_exec_output": state["git_exec_output"],
 			"search_context": state["search_context"],
@@ -144,6 +147,8 @@ def _build_app():
 
 	def self_edit_ape_node(state: SwarmState) -> SwarmState:
 		guardrail_note = ""
+		applied_patches = []
+		
 		if not state["enable_self_edit"]:
 			self_edit_output = "Self-edit loop disabled for this run."
 			self_edit_diff_preview = ""
@@ -155,6 +160,18 @@ def _build_app():
 				iterations=state["self_edit_iterations"],
 			)
 			self_edit_diff_preview = _build_self_edit_diff_preview(self_edit_output)
+			
+			# Apply patches if write is confirmed
+			if state["allow_git_write"] and state["confirm_self_edit_write"]:
+				patch_count, applied_patches = apply_self_edit_patches(
+					self_edit_output=self_edit_output,
+					repo_root=Path.cwd(),
+					model=model,
+				)
+				if patch_count > 0:
+					guardrail_note = f"Applied {patch_count} self-edit patches: {', '.join(applied_patches[:3])}"
+					if len(applied_patches) > 3:
+						guardrail_note += f" and {len(applied_patches) - 3} more"
 
 		if state["enable_self_edit"] and state["allow_git_write"] and not state["confirm_self_edit_write"]:
 			guardrail_note = (
@@ -177,6 +194,7 @@ def _build_app():
 			"self_edit_output": self_edit_output,
 			"self_edit_diff_preview": self_edit_diff_preview,
 			"self_edit_guardrail_note": guardrail_note,
+			"self_edit_applied_patches": applied_patches,
 			"git_output": state["git_output"],
 			"git_exec_output": state["git_exec_output"],
 			"search_context": state["search_context"],
@@ -208,6 +226,7 @@ def _build_app():
 			"self_edit_output": state["self_edit_output"],
 			"self_edit_diff_preview": state["self_edit_diff_preview"],
 			"self_edit_guardrail_note": state["self_edit_guardrail_note"],
+			"self_edit_applied_patches": state["self_edit_applied_patches"],
 			"git_output": git_output,
 			"git_exec_output": git_exec_output,
 			"search_context": state["search_context"],
@@ -260,6 +279,7 @@ def execute_swarm(
 		"self_edit_output": "",
 		"self_edit_diff_preview": "",
 		"self_edit_guardrail_note": "",
+		"self_edit_applied_patches": [],
 		"git_output": "",
 		"git_exec_output": "",
 		"search_context": search_context,
@@ -280,6 +300,9 @@ def execute_swarm(
 				events.append({"agent": "TruthApe", "content": patch["truth_output"]})
 			elif node_name == "self_edit_ape" and patch.get("self_edit_output"):
 				events.append({"agent": "SelfEditApe", "content": patch["self_edit_output"]})
+				if patch.get("self_edit_applied_patches"):
+					applied_list = "\n".join(f"- {f}" for f in patch["self_edit_applied_patches"])
+					events.append({"agent": "PatchesApplied", "content": f"Applied patches:\n{applied_list}"})
 				if patch.get("self_edit_diff_preview"):
 					events.append({"agent": "DiffPreview", "content": patch["self_edit_diff_preview"]})
 				if patch.get("self_edit_guardrail_note"):
