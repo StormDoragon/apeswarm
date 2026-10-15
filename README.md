@@ -37,7 +37,7 @@ uv run apeswarm "build something that will shake the world"
 
 # optional flags
 uv run apeswarm "ship this safely" --self-edit --self-edit-iterations 2
-uv run apeswarm "prepare release" --allow-git-write --auto-confirm
+uv run apeswarm "prepare release" --allow-git-write
 ```
 
 ## Choose Your Brain (`.env`)
@@ -82,7 +82,28 @@ GitApe:
 	- Set `OLLAMA_MODEL=llama3.1:8b` (or `llama3.2`)
 	- Ensure Ollama is installed and running, then `ollama pull <model>`
 - **Ollama too slow?** Try `groq` for fast hosted inference, or `xai` for strongest sarcasm personality.
-- **GitApe capability today:** can execute real branch+commit with `--allow-git-write --auto-confirm`.
+- **GitApe capability today:** defaults to a dry run. `--allow-git-write` previews the branch, message, tracked diff, and file status, then asks for `y` before creating a branch and committing. Noninteractive input cancels. `--auto-confirm` explicitly bypasses that prompt for automation. Existing branch names are rejected instead of reset. The CLI commits all current nonignored changes, including untracked files listed in the preview; review those files before confirming.
+
+### Apply an exact patch
+
+For integrations that already have a unified diff, use the patch-scoped tool:
+
+```python
+from pathlib import Path
+from apeswarm.core.git_executor import create_branch_and_commit
+
+result = create_branch_and_commit(
+    diff, "feat/my-change", "feat: my change", Path.cwd()
+)
+print(result)  # validates the patch and previews it without writing
+# Pass allow_write=True to request interactive confirmation and apply it.
+```
+
+This tool requires a clean repository with an initial commit and commits only
+the supplied patch. Failures are reported without forcing or resetting branches.
+If a write fails midway, inspect `git status` before retrying; no destructive
+rollback is attempted. Run the offline regression tests with
+`python -m pytest tests -q` (install `pytest` and `GitPython` first).
 
 ## Manifesto
 We do not politely hallucinate.  
